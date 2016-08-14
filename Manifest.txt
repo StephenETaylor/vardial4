@@ -1,0 +1,31 @@
+-rw-r--r--  1 staylor staylor  51130 Aug  5 15:06 DSL 2016 Training Set Release.html
+This is the documentation for the data.
+
+-rw-r--r--  1 staylor staylor 164587 Aug  5 15:11 DSL-training.zip
+This is the zip file from varDial site
+
+-rw-r--r--  1 staylor staylor   2271 Aug  5 20:59 dsum.lua
+This file gathers and prints some summary statistics about the data
+
+-rw-r--r--  1 staylor staylor  16044 Apr 30 15:15 KarpathyTrain.lua
+Karpathy LSTM code.  Originally downloaded to ~/summer16/EmmaExample/Karpathy
+
+-rw-r--r--  1 staylor staylor      0 Aug  8 13:43 Manifest.txt
+This file
+
+drwx------  2 staylor staylor   4096 Aug  5 08:07 model/
+Description of the LSTM (and other) models used by the Karpathy code.
+I'll be modifying this.
+
+-rw-r--r--  1 staylor staylor    785 Aug  8 13:42 Readme.txt
+
+-rw-r--r--  1 staylor staylor  16263 Aug  5 21:43 train.lua
+Changes in progress
+
+-rw-r--r--  1 staylor staylor  16044 Aug  5 21:01 train.lua~
+drwx------  2 staylor staylor   4096 Aug  4 21:53 util/
+This directory holds files used by the Karpathy code
+
+drwxr-xr-x  2 staylor staylor   4096 Aug  8 11:47 varDialTrainingData/
+This directory holds the data, and a python script I wrote to de-Buckwalter it,
+and 5 extracted unicode data files.
