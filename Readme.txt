@@ -21,5 +21,20 @@ xliterate.py -- mentioned above, turns training file into 5 dialect files
 split-task.py -- splits training file into training, validation, testing files
 testform.py -- transforms a test file to drop out the correct answers.
 
+To train with this code:
+th train.lua -seq_length 520 -data_dir varDialTrainingData -gpuid -1
+
+where  
+  th invokes the Torch package (see http://torch.ch/)
+  train.lua is the top-level code, but it also calls code in model, util, model-util, misc directories
+  -seq_length 520 is an effort to include at least the first 520 characters of each training item.  much smaller sequence lengths are possible, but this 
+length discards little of the training data.  The median sequence length in
+the training data is about 300 -- I think 520 is beyond the 90th percentile.
+  The varDialTrainingData directory includes the "training" file, which 
+is used for training data.
+  -gpuid -1 indicates that my laptop does not have an nVidia graphics card,
+and I am using the CPU for training.
+
+
 makefile sort of documents usage of scripts.
 I'm going to go ahead and modify the version of train.lua and its model.LSTM.lua etc. files in this directory.  If I want to follow up idea (1) above, I can use the version of the files in ~/summer16/EmmaExample/Karpathy, which takes its inut from data/input.txt.
