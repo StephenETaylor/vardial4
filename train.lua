@@ -235,42 +235,6 @@ function prepro(x,y)
     return x,y
 end
 
--- evaluate the loss over an entire split
-function eval_split(split_index, max_batches)
-    print('evaluating loss over split index ' .. split_index)
-
-    -- SET removed computation of n, number of batches in split, here
-
-    loader:reset_batch_pointer(split_index) -- move batch iteration pointer for this split to front
-    local loss = 0
-    local rnn_state = {[0] = init_state}
-    
-    n = 0 -- no batches seen yet
-    while 1  do -- iterate over batches in the split (SET was for loop on n)
-        -- fetch a batch
-        local x, y = loader:next_batch(split_index)
-        if x == nil then break end -- SET end of split?
-        x,y = prepro(x,y)  -- code does a transpose
-        -- forward pass
-        local loc_seq_len = x:size(1) -- get length of sequences in this batch
-        for t=1,loc_seq_length do
-            clones.rnn[t]:evaluate() -- for dropout proper functioning
-            local lst = clones.rnn[t]:forward{x[t], unpack(rnn_state[t-1])}
-            rnn_state[t] = {}
-            for i=1,#init_state do table.insert(rnn_state[t], lst[i]) end
-            prediction = lst[#lst] 
-            loss = loss + clones.criterion[t]:forward(prediction, y[t])
-        end
-        -- carry over lstm state
-        rnn_state[0] = rnn_state[#rnn_state]
-        n = n+1 -- SET count batches 
-        print( n '...')
-    end
-
-    loss = loss / loc_seq_length / n
-    return loss
-end
-
 function narrow_list_matching(listOfTensors, dim1) 
     if dim1 < 1 or dim1 > 50 then dbg() end -- if
     answer = {}
@@ -282,6 +246,46 @@ end
 
 -- do fwd/bwd and return loss, grad_params
 local init_state_global = clone_list(init_state)
+
+
+-- evaluate the loss over an entire split
+function eval_split(split_index, max_batches)
+    print('evaluating loss over split index ' .. split_index)
+
+    -- SET removed computation of n, number of batches in split, here
+
+    loader:reset_batch_pointer(split_index) -- move batch iteration pointer for this split to front
+    local loss = 0
+    
+    local n = 0 -- no batches seen yet
+    local m = 0 -- no sequences seen yet
+    while 1  do -- iterate over batches in the split (SET was for loop on n)
+        -- fetch a batch
+        local x, y = loader:next_batch(split_index)
+        if x == nil then break end -- SET end of split?
+        x,y = prepro(x,y)  -- code does a transpose
+        -- forward pass
+        local loc_seq_len = x:size(1) -- get length of sequences in this batch
+        local rnn_state = {[0] = narrow_list_matching(clone_list(init_state), x:size(2))}
+        for t=1,loc_seq_len do
+            clones.rnn[t]:evaluate() -- for dropout proper functioning
+            local lst = clones.rnn[t]:forward{x[t], unpack(rnn_state[t-1])}
+            rnn_state[t] = {}
+            for i=1,#init_state do table.insert(rnn_state[t], lst[i]) end
+            prediction = lst[#lst] 
+            loss = loss + clones.criterion[t]:forward(prediction, y[t])
+        end
+        -- carry over lstm state
+        rnn_state[0] = rnn_state[#rnn_state]
+        n = n+1 -- SET count batches 
+        m = m+1 -- SET count sequences
+        if 0 == n%100 then print( n .. '...') end -- if 0
+    end
+
+    loss = loss / m
+    return loss
+end
+
 function feval(x)
     if x ~= params then
         params:copy(x)

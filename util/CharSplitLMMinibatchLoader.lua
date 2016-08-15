@@ -21,6 +21,9 @@
    sequences by carving out subsequences of long training data, although
    my dsum program suggests that ten percent of the batches contain sequences
    of longer than 520 characters.  
+
+   My plan for dealing with those pieces of training data is to split long
+   sequences of training data into shorter ones, possibly by hand.
 ]]--
 local CharSplitLMMinibatchLoader = {}
 CharSplitLMMinibatchLoader.__index = CharSplitLMMinibatchLoader
@@ -43,6 +46,7 @@ function CharSplitLMMinibatchLoader.create(data_dir, batch_size, seq_length, spl
 
     local vocab_file = path.join(data_dir, 'vocab.t7')
     local tensor_file = path.join(data_dir, 'data.t7')
+    local vtensor_file = path.join(data_dir, 'datav.t7')
 
     -- fetch file attributes to determine if we need to rerun preprocessing
     local run_prepro = false
@@ -66,14 +70,18 @@ function CharSplitLMMinibatchLoader.create(data_dir, batch_size, seq_length, spl
         -- construct a tensor with all the data, and vocab file
         print('one-time setup: preprocessing input text file ' .. input_file .. '...')
         CharSplitLMMinibatchLoader.text_to_tensor(input_file, vocab_file, tensor_file)
+        CharSplitLMMinibatchLoader.text_to_tensor(valid_file, nil, vtensor_file)
     end
 
     print('loading data files...')
     local data = torch.load(tensor_file)
+    local vdata = torch.load(vtensor_file)
     --dbg()  -- When not commented out, this is a breakpoint for debugger.LUA
     self.vocab_mapping = torch.load(vocab_file)
     self.data_tab = data.data_tab
     self.longest_sequence = data.largest
+    self.vdata_tab = vdata.data_tab
+    self.vlongest_sequence = vdata.largest
     
     -- count vocab
     self.vocab_size = 0
@@ -87,6 +95,15 @@ function CharSplitLMMinibatchLoader.create(data_dir, batch_size, seq_length, spl
         local seq_table = self.data_tab[i]
         if seq_table then
             self.ntrain = self.ntrain + #seq_table
+        end -- if seq_table
+    end -- for i
+
+    -- count number of sequences in validation data
+    self.nval = 0
+    for i = 1, self.vlongest_sequence do
+        local seq_table = self.vdata_tab[i]
+        if seq_table then
+            self.nval = self.nval + #seq_table
         end -- if seq_table
     end -- for i
 
@@ -168,8 +185,14 @@ function CharSplitLMMinibatchLoader:next_batch(split_index)
     end
     -- split_index is integer: 1 = train, 2 = val, 3 = test
 
+    local dataTab;
+    if split_index == 1 then dataTab = self.data_tab
+    elseif split_index == 2 then dataTab = self.vdata_tab
+    else cry()    --#not prepared to handle any other split_indices
+    end -- if split_index
+
     while true do 
-        local seq_array = self.data_tab[self.batch_ix[split_index]]
+        local seq_array = dataTab[self.batch_ix[split_index]]
         if seq_array == nil then 
             self.batch_ix[split_index] = self.batch_ix[split_index] + 1
             self.batch_ix2[split_index] = 1
@@ -269,6 +292,8 @@ end
  I'll write while watching how well this one trains.
 
  As of Aug 11, 2016 I don't actually read in the validation data.
+ On Aug 15, I endeavor to call this code once for the training data and
+ once for the validation data.
 
 ]]--
 function CharSplitLMMinibatchLoader.text_to_tensor(in_textfile, out_vocabfile, out_tensorfile)
@@ -279,14 +304,16 @@ function CharSplitLMMinibatchLoader.text_to_tensor(in_textfile, out_vocabfile, o
     local rawdata
     local tot_len = 0
     local f = assert(io.open(in_textfile, "r"))
-
-    -- create vocabulary if it doesn't exist yet
-    print('creating vocabulary mapping...')
 -- SET: I made this variable global, even though it is only used here...
 -- defined at the beginning of this file
 --    local dialects = {EGY = 1, GLF = 2, LAV = 3, MSA = 4, NOR = 5}
     local data_tab = {}
     local largest = 0     -- largest index in data_tab
+
+    -- create vocabulary if it doesn't exist yet
+    if out_vocabfile then 
+        print('creating vocabulary mapping...') 
+    end --if 
 
     -- record all characters to a set
 
@@ -306,10 +333,13 @@ function CharSplitLMMinibatchLoader.text_to_tensor(in_textfile, out_vocabfile, o
         local text = line:sub(1,t1-1)
         local ltext = text:len()
         local dial = line:sub(t2+1,-1)
-        -- add characters to vocabulary
-        for char in text:gmatch'.' do
-            if not unordered[char] then unordered[char] = true end
-        end
+        if out_vocabfile then 
+            -- add characters to vocabulary
+            for char in text:gmatch'.' do
+                if not unordered[char] then unordered[char] = true end
+            end
+        end --if out_vocabfile
+
         -- store characters into sequence object, with y value;
         local seq_obj = {text = text, y = dialects[dial]}
 
@@ -340,14 +370,16 @@ function CharSplitLMMinibatchLoader.text_to_tensor(in_textfile, out_vocabfile, o
     f:close()
  
     -- sort vocabulary into a table (i.e. keys become 1..N)
-    local ordered = {}
-    for char in pairs(unordered) do ordered[#ordered + 1] = char end
-    table.sort(ordered)
-    -- invert `ordered` to create the char->int mapping
     local vocab_mapping = {}
-    for i, char in ipairs(ordered) do
-        vocab_mapping[char] = i
-    end
+    if out_vocabfile then 
+        local ordered = {}
+        for char in pairs(unordered) do ordered[#ordered + 1] = char end
+        table.sort(ordered)
+    -- invert `ordered` to create the char->int mapping
+        for i, char in ipairs(ordered) do
+            vocab_mapping[char] = i
+        end
+    end --if out_vocabfile
 -- SET: build a table/object containing the data, which, unlike the 
 -- original scheme, will still have to be reprocessed with the vocabulary
     local data = {data_tab = data_tab, largest = largest}
@@ -368,8 +400,11 @@ function CharSplitLMMinibatchLoader.text_to_tensor(in_textfile, out_vocabfile, o
 --    f:close()
 
     -- save output preprocessed files
-    print('saving ' .. out_vocabfile)
-    torch.save(out_vocabfile, vocab_mapping)
+    if out_vocabfile then 
+        print('saving ' .. out_vocabfile)
+        torch.save(out_vocabfile, vocab_mapping)
+    end --if out_vocabfile
+
     print('saving ' .. out_tensorfile)
     torch.save(out_tensorfile, data)
 end
