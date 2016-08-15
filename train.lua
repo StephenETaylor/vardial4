@@ -257,6 +257,7 @@ function eval_split(split_index, max_batches)
     loader:reset_batch_pointer(split_index) -- move batch iteration pointer for this split to front
     local loss = 0
     
+    local l = 0 -- no characters seen yet
     local n = 0 -- no batches seen yet
     local m = 0 -- no sequences seen yet
     while 1  do -- iterate over batches in the split (SET was for loop on n)
@@ -274,6 +275,7 @@ function eval_split(split_index, max_batches)
             for i=1,#init_state do table.insert(rnn_state[t], lst[i]) end
             prediction = lst[#lst] 
             loss = loss + clones.criterion[t]:forward(prediction, y[t])
+            l = l+1 -- SET count characters
         end
         -- carry over lstm state
         rnn_state[0] = rnn_state[#rnn_state]
@@ -282,7 +284,7 @@ function eval_split(split_index, max_batches)
         if 0 == n%100 then print( n .. '...') end -- if 0
     end
 
-    loss = loss / m
+    loss = loss / l
     return loss
 end
 
