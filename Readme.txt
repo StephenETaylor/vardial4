@@ -21,6 +21,9 @@ xliterate.py -- mentioned above, turns training file into 5 dialect files
 split-task.py -- splits training file into training, validation, testing files
 testform.py -- transforms a test file to drop out the correct answers.
 
+
+makefile sort of documents usage of scripts.
+
 To train with this code:
 th train.lua -seq_length 520 -data_dir varDialTrainingData -gpuid -1
 
@@ -35,6 +38,10 @@ is used for training data.
   -gpuid -1 indicates that my laptop does not have an nVidia graphics card,
 and I am using the CPU for training.
 
+The code defaults to producing a checkpoint after every 1000 batches.
+It's supposed to run for 50 epochs, but there may not be time enough
+before August 31.  The validation loss function does seem to be decreasing
+slowly.
 
-makefile sort of documents usage of scripts.
-I'm going to go ahead and modify the version of train.lua and its model.LSTM.lua etc. files in this directory.  If I want to follow up idea (1) above, I can use the version of the files in ~/summer16/EmmaExample/Karpathy, which takes its inut from data/input.txt.
+Wrote test.lua which can specify a model; it accepts test lines from
+standard input and writes standard output.  
