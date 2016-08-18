@@ -45,3 +45,12 @@ slowly.
 
 Wrote test.lua which can specify a model; it accepts test lines from
 standard input and writes standard output.  
+
+varDialTrainingData/statistics.lua accepts the name of a test output file on
+the command line [e.g. th statistics.lua ../a2] and compares against a 
+(reserved from the training data) file "training" -- which contains the 
+truth as offered by the workshop.
+
+As of 18 August 2016, the train.lua script bombs out after a little more than
+one epoch of training, announcing that the loss function is blowing up.
+I'm going to play with this, but don't know what to do next.
