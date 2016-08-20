@@ -30,7 +30,7 @@ license, but my additions are public domain.
 
 
 dialects = {EGY = 1, GLF = 2, LAV = 3, MSA = 4, NOR = 5}
-chkpt = 'cv/lm_lstm_epoch0.87_1.5784.t7'
+chkpt = 'cv/lm_lstm_epoch1.02_1.5529.t7'
 
 require 'torch'
 require 'nn'
@@ -63,8 +63,9 @@ for i=1,#arg do
         else 
             print('unknown flag', arg[i], 'usage:\nth test.lua -init_from chkpt')
         end -- if arg[i] = 'init_from'
+    else -- ignore was true
+        ignore = false
     end -- if not ignore
-    ignore = false
 end -- for
 
 -- read checkpoint file
