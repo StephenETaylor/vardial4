@@ -54,3 +54,19 @@ truth as offered by the workshop.
 As of 18 August 2016, the train.lua script bombs out after a little more than
 one epoch of training, announcing that the loss function is blowing up.
 I'm going to play with this, but don't know what to do next.
+
+Decided to modify the training data.  The problem seems to be a wide
+variation in the loss functions for sequences longer than 1000 characters.
+Since we're not training with the earlier part of such sequences, it
+makes sense to eliminate them somehow.  I created two variant training files,
+training.s and training.t.   Training.s has all sequences greater than 490
+characters split at the next space.  Training.t truncates all sequences
+greater than 490 characters at the next space. Both approaches eliminate
+the long sequences; the .s file may include some code-switching, as longer
+sequences provide more opportunities for it.
+
+Training with the training.t file revealed a bug in wrapping around, 
+previously concealed by the very large sequences in the data (the largest of
+which were not being processed.)
+
+

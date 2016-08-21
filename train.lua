@@ -406,7 +406,7 @@ for i = 1, iterations do
     end
 
     if i % opt.print_every == 0 then
-        print(string.format("%d/%d (epoch %.3f), train_loss = %6.8f, grad/param norm = %6.4e, time/batch = %.4fs", i, iterations, epoch, train_loss, grad_params:norm() / params:norm(), time))
+        print(string.format("%d/%d (epoch %.3f), train_loss = %6.8f, grad/param norm = %6.4e, time/batch = %.4fs last seq_len %d", i, iterations, epoch, train_loss, grad_params:norm() / params:norm(), time, progress))
     end
    
     if i % 10 == 0 then collectgarbage() end

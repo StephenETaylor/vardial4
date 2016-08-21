@@ -161,7 +161,8 @@ function CharSplitLMMinibatchLoader.create(data_dir, batch_size, seq_length, spl
 ]]--
 
     -- SET: these may not get exercised any more, but we'll see.
-    self.split_sizes = {self.ntrain, self.nval, self.ntest}
+    -- at any rate I've changed the values to match my usages
+    self.split_sizes = {self.longest_sequence, self.vlongest_sequence, self.ntest}
     self.batch_ix = {0,0,0} -- SET: this turns out to be harmless
     self.batch_ix2 = {1,1,1} -- but first index is 1 for non-sparse Lua array
 
@@ -191,20 +192,24 @@ function CharSplitLMMinibatchLoader:next_batch(split_index)
     else cry()    --#not prepared to handle any other split_indices
     end -- if split_index
 
+    local looping = 0
     while true do 
+	looping = looping + 1
+        if looping > 10000 then dbg() end -- if debugging
         local seq_array = dataTab[self.batch_ix[split_index]]
-        if seq_array == nil then 
+        if self.batch_ix[split_index] > self.split_sizes[split_index] then
+            return nil, nil -- warn caller we have finished, let her call reset_batch_pointer
+            --self.batch_ix[split_index] = 1 -- cycle around to beginning
+        elseif seq_array == nil then 
             self.batch_ix[split_index] = self.batch_ix[split_index] + 1
             self.batch_ix2[split_index] = 1
         elseif self.batch_ix2[split_index] > #(seq_array) then 
             self.batch_ix[split_index] = self.batch_ix[split_index] + 1
             self.batch_ix2[split_index] = 1
-        elseif self.batch_ix[split_index] > self.split_sizes[split_index] then
-            return nil, nil -- warn caller we have finished, let her call reset_batch_pointer
-            --self.batch_ix[split_index] = 1 -- cycle around to beginning
         else 
 
             local bat_siz = math.min(opt.batch_size, 1+#(seq_array) - self.batch_ix2[split_index])
+	    progress = self.batch_ix[split_index] -- save current sequence length for debugging
             local seq_siz = math.min(opt.seq_length, self.batch_ix[split_index])
             -- construct a tensor holding the data
             -- it is wide enough for these sequences (all of which are
