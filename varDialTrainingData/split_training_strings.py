@@ -30,7 +30,7 @@ droptrain = open("training.t",'w')
 for line in rawtrain:
     t = line.find('\t')
     tseg = line[:t]
-    dialect = line[t+2:]
+    dialect = line[t+3:]
     if len(tseg) < 520 :
         splittrain.write(line)
         droptrain.write(line)

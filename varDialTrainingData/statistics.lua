@@ -18,7 +18,7 @@ for k,v in pairs(dialects) do idialect[v] = k end -- for k,v
 crosserrors = {{0,0,0,0,0}, {0,0,0,0,0}, {0,0,0,0,0}, {0,0,0,0,0}, {0,0,0,0,0} }
 totalerror = 0
 
-finterest = io.open(arg[1],'r')
+finterest = io.stdin  --io.open(arg[1],'r')
 fref = io.open('testing','r')
 if not fref then print ('?cannot open "testing"') end --if not fref
 

@@ -11,3 +11,7 @@ data_LAV:	training
 test.txt:	training
 	python3 testform.py <testing
 
+
+#
+%.stat:	cv/%.t7
+	th test.lua -init_from $^ < varDialTrainingData/test.txt | (cd varDialTrainingData; th statistics.lua )
