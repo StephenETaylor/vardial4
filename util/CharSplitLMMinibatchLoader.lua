@@ -220,7 +220,8 @@ function CharSplitLMMinibatchLoader:next_batch(split_index)
             local answer_y = torch.Tensor(bat_siz,seq_siz)
             for b =1, bat_siz do
                 local seq_obj = seq_array[self.batch_ix2[split_index] + b -1]
-                -- if not seq_obj then dbg() end
+                if not seq_obj then dbg() end
+                
                 local t = 0
                 answer_x[b]:apply
                     (function(x) 
@@ -228,6 +229,7 @@ function CharSplitLMMinibatchLoader:next_batch(split_index)
                         return self.vocab_mapping[seq_obj.text:sub(t,t)]
                      end -- function
                     )
+                if not seq_obj.y then dbg() end
                 answer_y[b]:fill(seq_obj.y)
             end -- for b
             self.batch_ix2[split_index] = bat_siz + self.batch_ix2[split_index]
@@ -346,6 +348,7 @@ function CharSplitLMMinibatchLoader.text_to_tensor(in_textfile, out_vocabfile, o
         end --if out_vocabfile
 
         -- store characters into sequence object, with y value;
+        if not dialects[dial] then dbg() end
         local seq_obj = {text = text, y = dialects[dial]}
 
         -- store sequence object into table of other sequences of same length

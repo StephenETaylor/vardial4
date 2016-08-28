@@ -41,7 +41,7 @@ require 'lfs'
 require 'util.OneHot'
 require 'util.misc'
 
-dbg = require 'LuaDebugger.debugger'
+--dbg = require 'LuaDebugger.debugger' -- disabled to avoid line in output file
 
 -- invert dialects
 idialects = {}

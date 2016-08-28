@@ -69,4 +69,27 @@ Training with the training.t file revealed a bug in wrapping around,
 previously concealed by the very large sequences in the data (the largest of
 which were not being processed.)
 
+Aug 25
+Training a 3-layer lstm, I run out of memory at sequence length of 460.
+I've been using a max sequence length of 520, but don't need state for
+more versions of the hidden state than the length of the sequence.  I'm going 
+to attempt to change the memory allocated to the instance, and if that
+fails, to create another instance with more memory.  (Which might be a
+reasonable time to switch to a cloud instance supporting nvidia... Amazon ec2?)
+In order to get a reasonable error, I run the instance with
+  sudo sysctl vm.overcommit_memory=2
+(otherwise the process is quietly killed.  With overcommit_memory=2 the 
+malloc fails, and th gives me a reasonable stack trace, which appears in
+a nohup  ... >log output.)
+So I edited the instance to get 2CPUs, which I don't need, and 7.5GB, which I
+do, and restarted training, again with vm.overcommit_memory=2  
+The training still failed, this time at a sequence length of 490 -- which is
+where it was killed without traceback if vm.overcommitt_memory was zero.
+It's possible that this is an issue with pointer sizes, since the single 
+process is very large.  Can torch handle 64-bit pointers?  Possibly also a
+google issue.
+It seems likely that I can train a 3-layer lstm if I use a max sequence length
+of 400.  If I go for 450, I waste some training data, possibly as much as 15%
 
+Torch apparently can't handle more than 4GB; this is apparently due to a 
+LuaJit deficiency.  
