@@ -51,6 +51,7 @@ for k,v in pairs(dialects) do idialects[v] = k end -- for
 interactive = false
 verbose = false
 ignore = false
+probsFile = nil
 for i=1,#arg do 
     if not ignore then 
         if arg[i] == '-init_from' then
@@ -60,6 +61,9 @@ for i=1,#arg do
             verbose = true 
         elseif arg[i] == '-interactive' then 
             interactive = true 
+        elseif arg[i] == '-probs_file' then
+            probsFile = arg[i+1]
+            ignore = true
         else 
             print('unknown flag', arg[i], 'usage:\nth test.lua -init_from chkpt')
         end -- if arg[i] = 'init_from'
@@ -67,6 +71,11 @@ for i=1,#arg do
         ignore = false
     end -- if not ignore
 end -- for
+
+-- open possible probsFile for output
+if probsFile then
+    probsFile = io.open(probsFile,'w')
+end -- if probsFile
 
 -- read checkpoint file
 checkpoint = torch.load(chkpt)
@@ -132,6 +141,13 @@ while testInput do
         if verbose then
             print('char',t,'predict',probs[1],probs[2],probs[3],probs[4],probs[5])
         end -- if verbose
+
+        -- if -probs_file output requested, write probabilities to file
+        if probsFile then
+            probsFile:write(string.format('%.5f %.5f %.5f %.5f %.5f\n',
+                                  probs[1],probs[2],probs[3],probs[4],probs[5]))
+        end -- if probsFile
+
     end
 
 -- print result
@@ -152,3 +168,4 @@ while testInput do
     testInput = io.read()
 
 end -- while testInput
+if probsFile then probsFile:close() end -- if probsFile

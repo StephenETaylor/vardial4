@@ -15,3 +15,6 @@ test.txt:	training
 #
 %.stat:	cv/%.t7
 	th test.lua -init_from $^ < varDialTrainingData/test.txt | (cd varDialTrainingData; th statistics.lua )
+
+wordstats:	wordfreq.py
+	python3 wordfreq.py | (cd varDialTrainingData; th statistics.lua )

@@ -88,8 +88,12 @@ where it was killed without traceback if vm.overcommitt_memory was zero.
 It's possible that this is an issue with pointer sizes, since the single 
 process is very large.  Can torch handle 64-bit pointers?  Possibly also a
 google issue.
-It seems likely that I can train a 3-layer lstm if I use a max sequence length
-of 400.  If I go for 450, I waste some training data, possibly as much as 15%
 
 Torch apparently can't handle more than 4GB; this is apparently due to a 
 LuaJit deficiency.  
+
+It seems likely that I can train a 3-layer lstm if I use a max sequence length
+of 400.  For a max of 450, I got out-of-memory errors at sequence length of
+420, because the maximum batch size was 50, and really used a batch size of 50 
+for 420,421, etc. (would probably have used 100+) for these.  Using a max batch ize of 25 permits training to continue; THIS probably would have worked also
+for max sequence length of 520.

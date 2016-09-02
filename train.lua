@@ -28,7 +28,8 @@ which is turn based on other stuff in Torch, etc... (long lineage)
 --  the entire package unzipped in directory LuaDebugger
 --  the folder name as unzipped is debugger.lua-master, but I aliased it
 --  to avoid the ., which require uses to delimit path names.
-dbg = require "LuaDebugger.debugger" 
+ -- moved require down, now conditional on cmdline option:
+ -- dbg = require "LuaDebugger.debugger" 
 
 require 'torch'
 require 'nn'
@@ -81,10 +82,17 @@ cmd:option('-accurate_gpu_timing',0,'set this flag to 1 to get precise timings w
 -- GPU/CPU
 cmd:option('-gpuid',0,'which gpu to use. -1 = use CPU')
 cmd:option('-opencl',0,'use OpenCL (instead of CUDA)')
+cmd:option('-debugger',0,'load debugger')
 cmd:text()
 
 -- parse input params
 opt = cmd:parse(arg)
+
+# load debugger if requested
+if opt.debugger ~= 0 then 
+    dbg = require 'LuaDebugger.debugger' 
+end -- if opt.debugger
+
 torch.manualSeed(opt.seed)
 -- train / val / test split for data, in fractions
 local test_frac = math.max(0, 1 - (opt.train_frac + opt.val_frac))
