@@ -19,7 +19,7 @@ dialects = {EGY = 1, GLF = 2, LAV = 3, MSA = 4, NOR = 5}
 This code strongly based on 
 https://github.com/karpathy/char-rnn
 
-See his comments for his sources;
+See his comments below for his sources;
 I faintly remember that he might have said his code was released under MIT
 license, but my additions are public domain.
 
@@ -142,12 +142,6 @@ while testInput do
             print('char',t,'predict',probs[1],probs[2],probs[3],probs[4],probs[5])
         end -- if verbose
 
-        -- if -probs_file output requested, write probabilities to file
-        if probsFile then
-            probsFile:write(string.format('%.5f %.5f %.5f %.5f %.5f\n',
-                                  probs[1],probs[2],probs[3],probs[4],probs[5]))
-        end -- if probsFile
-
     end
 
 -- print result
@@ -158,6 +152,12 @@ while testInput do
     else
         print (testInput..'\t'..idialects[max]) -- standard output format
     end -- if
+
+    -- if -probs_file output requested, write probabilities to file
+    if probsFile then
+        probsFile:write(string.format('%.5f %.5f %.5f %.5f %.5f\n',
+                              probs[1],probs[2],probs[3],probs[4],probs[5]))
+    end -- if probsFile
 
     if interactive then
         io.write('ready? ')

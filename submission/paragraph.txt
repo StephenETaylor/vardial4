@@ -1,0 +1,9 @@
+AHAQST-closed-C-run1.txt : The model was trained on all training tri-gram data set using 10-fold cross validation on SVM classifier after doing feature selection using information gain.
+
+AHAQST-closed-C-run2.txt : The model is word-based.  Words which occur more thanfive times in all are scored for frequency in each dialect.  Each test sentence is scored for match to dialect, essentially a unigram entropy.
+
+AHAQST-closed-C-run3.txt : Output is the result of combining run2 with two character-based LSTM neural net classifiers.
+
+Abualsoud Hanani
+Aziz Qaroushi
+Stephen Taylor

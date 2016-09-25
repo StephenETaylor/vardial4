@@ -1,99 +1,63 @@
-Intend to work on the varDial shared task in this directory.
-described at: http://ttg.uni-saarland.de/vardial2016/dsl2016.html
+This directory and its subdirectory contain the programs and data developed
+for the varDial 2016 Arabic dialect recognition shared task by
+team AHAQST:
+ahanani@birzeit.edu
+aqaroush@birzeit.edu
+staylor@fitchburgstate.edu
 
+Our first run was prepared by an SVM developed by aqaroush@birzeit.edu
+using character tri-grams extracted by ahanani@bitzeit.edu
+Two of the runs submitted, run2 and run3 are prepared by software here.
+Run2 used wordfreq.py
+and run3 combined run2 and the output of two LSTM neural networks
+written in torch, using a neural network combiner.m, written in Octave.
 
-My plan is to write an lstm rnn which will classify Arabic transcripts.
-I think it will be a variant of the Karpathy Torch char-rnn,
-http://karpathy.github.io/2015/05/21/rnn-effectiveness/
+Partial file manifest:
 
-   1)The loss function is closely related to the cross entropy between the
-   training text and the test text so one could use the code unmodified,
+combine.py	a python script for combining probability vectors by
+		plurality vote.  Not successful, output of wordfreq.py
+		was too polarized.
 
-   2)but I plan to rewrite the output of the model as a classifier,
-   perhaps with 5 soft-max outputs or conceivably as 5 separate nn's,
-   each classifying yes/no. (two soft-max outputs).
+ctxt		the shared task test input
+ctxt.c0		wordfreq.py output on the shared task (run2)
+ctxt.c1		torch test.lua -init_from cv/lm_lstm_epoch0.16_1.3176.t7 output
+ctxt.c2		th test.lua -init_from cw/lm_lstm_epoch0.32_1.4369.t7 output
+ctxt.c3		octave ex4/combiner.m output (run3)
+cv		directory holding checkpoints for 2-layer LSTM
+cw		directory holding checkpoints for 3-layer LSTM
+dsum.lua	lua program to summarize training data 
+esum.lua	lua program to summarize training data 
 
-8/Aug/2016.  I wrote and sent off a de-Buckwalter-er today.  I think I
-should split off some test data, some validation data.
+ex4		directory holding combiner.m development. contents follows:
+    c3data.mat			data for combiner.m	
+    checkNNGradients.m		octave subroutine source file
+    combiner.m			an octave script used to combine 3 model outputs
+    combiner.mat		the saved NN parameters used by combiner.m
+    computeNumericalGradient.m		octave subroutine source file
+    C.txt
+    debugInitializeWeights.m		octave subroutine source file
+    displayData.m		octave subroutine source file
+    ex4.m		training script, outputs combiner.mat
+    fmincg.m		octave subroutine source file
+    lib
+    m1.txt		link to probability vector file for wordfreq outputs
+    m2.txt		link to probability vector file for LSTM-2 outputs
+    m3.txt		link to probability vector file for LSTM-3 outputs
+    make_mat_file.py	used to prepare datafile for training
+    make_output.py	python script to reformat combiner output
+    nnCostFunction.m	octave subroutine source file
+    octave-core
+    predictions		combiner output
+    predict.m			octave subroutine which runs neural network
+    randInitializeWeights.m	octave subroutine source file
+    sigmoidGradient.m		octave subroutine source file
+    sigmoid.m			octave subroutine source file
 
-wrote some python scripts, all in varDialTrainingData:
-xliterate.py -- mentioned above, turns training file into 5 dialect files
-split-task.py -- splits training file into training, validation, testing files
-testform.py -- transforms a test file to drop out the correct answers.
-
-
-makefile sort of documents usage of scripts.
-
-To train with this code:
-th train.lua -seq_length 520 -data_dir varDialTrainingData -gpuid -1
-
-where  
-  th invokes the Torch package (see http://torch.ch/)
-  train.lua is the top-level code, but it also calls code in model, util, model-util, misc directories
-  -seq_length 520 is an effort to include at least the first 520 characters of each training item.  much smaller sequence lengths are possible, but this 
-length discards little of the training data.  The median sequence length in
-the training data is about 300 -- I think 520 is beyond the 90th percentile.
-  The varDialTrainingData directory includes the "training" file, which 
-is used for training data.
-  -gpuid -1 indicates that my laptop does not have an nVidia graphics card,
-and I am using the CPU for training.
-
-The code defaults to producing a checkpoint after every 1000 batches.
-It's supposed to run for 50 epochs, but there may not be time enough
-before August 31.  The validation loss function does seem to be decreasing
-slowly.
-
-Wrote test.lua which can specify a model; it accepts test lines from
-standard input and writes standard output.  
-
-varDialTrainingData/statistics.lua accepts the name of a test output file on
-the command line [e.g. th statistics.lua ../a2] and compares against a 
-(reserved from the training data) file "training" -- which contains the 
-truth as offered by the workshop.
-
-As of 18 August 2016, the train.lua script bombs out after a little more than
-one epoch of training, announcing that the loss function is blowing up.
-I'm going to play with this, but don't know what to do next.
-
-Decided to modify the training data.  The problem seems to be a wide
-variation in the loss functions for sequences longer than 1000 characters.
-Since we're not training with the earlier part of such sequences, it
-makes sense to eliminate them somehow.  I created two variant training files,
-training.s and training.t.   Training.s has all sequences greater than 490
-characters split at the next space.  Training.t truncates all sequences
-greater than 490 characters at the next space. Both approaches eliminate
-the long sequences; the .s file may include some code-switching, as longer
-sequences provide more opportunities for it.
-
-Training with the training.t file revealed a bug in wrapping around, 
-previously concealed by the very large sequences in the data (the largest of
-which were not being processed.)
-
-Aug 25
-Training a 3-layer lstm, I run out of memory at sequence length of 460.
-I've been using a max sequence length of 520, but don't need state for
-more versions of the hidden state than the length of the sequence.  I'm going 
-to attempt to change the memory allocated to the instance, and if that
-fails, to create another instance with more memory.  (Which might be a
-reasonable time to switch to a cloud instance supporting nvidia... Amazon ec2?)
-In order to get a reasonable error, I run the instance with
-  sudo sysctl vm.overcommit_memory=2
-(otherwise the process is quietly killed.  With overcommit_memory=2 the 
-malloc fails, and th gives me a reasonable stack trace, which appears in
-a nohup  ... >log output.)
-So I edited the instance to get 2CPUs, which I don't need, and 7.5GB, which I
-do, and restarted training, again with vm.overcommit_memory=2  
-The training still failed, this time at a sequence length of 490 -- which is
-where it was killed without traceback if vm.overcommitt_memory was zero.
-It's possible that this is an issue with pointer sizes, since the single 
-process is very large.  Can torch handle 64-bit pointers?  Possibly also a
-google issue.
-
-Torch apparently can't handle more than 4GB; this is apparently due to a 
-LuaJit deficiency.  
-
-It seems likely that I can train a 3-layer lstm if I use a max sequence length
-of 400.  For a max of 450, I got out-of-memory errors at sequence length of
-420, because the maximum batch size was 50, and really used a batch size of 50 
-for 420,421, etc. (would probably have used 100+) for these.  Using a max batch ize of 25 permits training to continue; THIS probably would have worked also
-for max sequence length of 520.
+makefile	goal %.c3 builds run3. goal c3train builds combiner NN
+Manifest.txt	an older version of the file manifest
+model		directory holds torch model descriptions
+test.lua	Torch source file for LSTM model evaluations
+train.lua	Torch source file for LSTM model training
+util		directory holds torch subroutines
+varDialTrainingData directory holds training data and scripts to transform it
+wordfreq.py	python script to generate run2

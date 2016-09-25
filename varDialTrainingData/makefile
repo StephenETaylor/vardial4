@@ -17,4 +17,29 @@ test.txt:	training
 	th test.lua -init_from $^ < varDialTrainingData/test.txt | (cd varDialTrainingData; th statistics.lua )
 
 wordstats:	wordfreq.py
-	python3 wordfreq.py | (cd varDialTrainingData; th statistics.lua )
+	python3 wordfreq.py | (cd varDialTrainingData; th statistics.lua ) 
+
+p88.txt:	wordfreq.py
+	python3 wordfreq.py -test varDialTrainingData/valid.txt -pout p88.txt > q88.txt
+
+p76.txt:	varDialTrainingData/valid.txt
+	th test.lua -init_from cv/lm_lstm_epoch0.16_1.3176.t7 -probs_file p76.txt < varDialTrainingData/valid.txt > q76.txt
+
+p69.txt:	varDialTrainingData/valid.txt
+	th test.lua -init_from cw/lm_lstm_epoch0.32_1.4369.t7 -probs_file p69.txt < varDialTrainingData/valid.txt > q69.txt
+
+c3data.mat:	p88.txt p76.txt p69.txt varDialTrainingData/validation
+	(cd ex4; python3 make_mat_file.py > $@)
+
+
+
+vprobs:	p88.txt p76.txt p69.txt
+
+c3train:	c3data.mat
+	(cd ex4; octave ex4.m)
+
+%.c3:	%
+	python3 wordfreq.py -test varDialTrainingData/valid.txt -pout ex4/m1.txt -test $< > q88.txt
+	th test.lua -init_from cv/lm_lstm_epoch0.16_1.3176.t7 -probs_file ex4/m2.txt < $<  > q76.txt
+	th test.lua -init_from cw/lm_lstm_epoch0.32_1.4369.t7 -probs_file ex4/m3.txt < $<  > q69.txt
+	(cd ex4; octave combiner.m; python3 make_output.py ../$< > ../$@)

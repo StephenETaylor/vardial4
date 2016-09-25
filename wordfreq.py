@@ -13,11 +13,15 @@ I've chosen a cut-off of 5 occurences in the training data to consider
 an n-gram worthwhile.
 """
 
+trainingFile = 'varDialTrainingData/training'
+
 five = 5
 ignore = True
 iprobsFile = None
 oprobsFile = None
 testfn = 'varDialTrainingData/test.txt'
+max_n_gram = 1
+verbose = False
 
 for i,arg in enumerate(sys.argv):
     if ignore: ignore = False
@@ -33,8 +37,15 @@ for i,arg in enumerate(sys.argv):
     elif arg == '-test':
         testfn = sys.argv[i+1]
         ignore = True
+    elif arg == '-max_n_gram':
+        max_n_gram = int(sys.argv[i+1])
+        ignore = True
+    elif arg == '-verbose':
+        verbose = True
     else:
-        print('usage:\npython3 wordfreq [-test file][-cutoff num][-combine file][-pout file] > testout')
+        print('illegal flag',arg)
+        print('usage:\npython3 wordfreq [-max_n_gram #][-test file][-cutoff num][-combine file][-pout file] > testout')
+        sys.exit(1)
 
 
 idialect = ["OTH" , "EGY", "GLF", "LAV", "MSA", "NOR"]
@@ -49,7 +60,7 @@ freq1 = [dict(), dict(), dict(), dict(), dict(), dict()]
 freq2 = [dict(), dict(), dict(), dict(), dict(), dict()]
 freq3 = [dict(), dict(), dict(), dict(), dict(), dict()]
 
-tr = open('varDialTrainingData/training', 'r')
+tr = open(trainingFile, 'r')
 
 for line in tr:
     totalLines += 1
@@ -80,24 +91,27 @@ unigrams = sorted(freq1[0].items(),key = (lambda a : a[1]), reverse=True)
 #print(unigrams[0], unigrams[1], unigrams[2], unigrams[3], unigrams[4])
 
 # estimate  most interesting deviations for each dialect from expected means
-sig = [0, [], [], [], [], []]
-dev = [0, {}, {}, {}, {}, {}]
-for d in range(1,6):
-    for (w,k) in freq1[d].items():
-        if freq1[0][w] < five: 
-            dev[d][w] = 0 
-            continue  # ignore infrequent words
-        ep =  freq1[0][w] / totalWords  # expected occurrences
-        ee = dialCount[d] * ep           # expected occurrences
-        evar = ep * (1 - ep)
-        es = math.sqrt(evar*dialCount[d])  # expect std deviation of occurances
-        sigmas = (k-ee)/es      # number of sigmas deviation
-        sig[d].append((w,sigmas,ee,k,es))
-        dev[d][w] = sigmas	# save these figures for later
-    sig[d].sort(key = (lambda x: abs(x[1])), reverse = True)
-#    print(d, sig[d][0], sig[d][1], sig[d][2], sig[d][3]) # report for debugging
+freq = [freq1, freq2, freq3]
+dev = []
+sig = [0, [], [], [], [], []] # we optionally report these, but don't retain 
+                              # them very long. So we don't need 1 for each n
+for n in range(max_n_gram):
+    dev.append([0, {}, {}, {}, {}, {}])
+    for d in range(1,6): 
+        for (w,k) in freq[n][d].items():
+            if freq[n][0][w] < five: 
+                dev[n][d][w] = 0 
+                continue  # ignore infrequent words
+            ep =  freq[n][0][w] / totalWords  # expected occurrences
+            ee = dialCount[d] * ep           # expected occurrences
+            evar = ep * (1 - ep)
+            es = math.sqrt(evar*dialCount[d])  # expect std deviation of occurances
+            sigmas = (k-ee)/es      # number of sigmas deviation
+            sig[d].append((w,sigmas,ee,k,es))
+            dev[n][d][w] = sigmas	# save these figures for later
+        sig[d].sort(key = (lambda x: abs(x[1])), reverse = True)
+        if verbose: print(d, sig[d][0], sig[d][1], sig[d][2], sig[d][3]) # report for debugging
 
-# presumably we can similarly estimate deviations for bigrams and trigrams
 
 # now  compute most-likely dialects for bag of words sentences from test file
 test = open(testfn,'r')
@@ -112,16 +126,36 @@ if oprobsFile:
 for line in test:
     p = [0]*6   # probability for each dialect
     
-    for w in line.split():
-        for d in range(1,6):
-            sigma = dev[d].get(w,0)
+    ll = line.split()
+    for w in ll:
+        for n in range(max_n_gram):
+            for d in range(1,6):
+                sigma = dev[n][d].get(w,0)
 #            t += sigma **2 #compute log-normal probability from sigma
 #            if sigma < 0:
 #                p[d] += -t      # rare words make dialect choice less probable
 #            else:
 #                p[d] += t       # common ones more likely
-            p[d] += sigma
+                p[d] += sigma
 
+    for d in range(1,6):
+        p[d] = p[d] / len(ll) / max_n_gram # normalize per word.  
+
+    # p[d] is a sum of deviations, not of probabilities
+    # we could have converted the deviations to probabilities with the
+    # cumulative probability distribution for the normal distribution, e.g. 
+    # two standard deviations below the mean is a probability of 0.0228,
+    # and three standard deviations above is a probability of 0.9987;
+    #  This computation would be straightforward in python 3.2 using
+    #  p[w] = 0.5 + math.erf(dev[n][d][w]/math.sqrt(2))/2
+    # but 1) We're using the frequency in the whole training set, not just the
+    #        dialect to compute interesting words, so the cross-entropy
+    #        calculation is a little messed up anyway
+    #     2) We'd want the log of the probability anyway to make the math
+    #        make sense.
+    #     3) each of those transformations is monotonic anyway.
+
+    # earlier, useless comment: (there's an intuition, but no good math for it)
     # P array ranges from -infinity to +infinity.  Use math.exp to bring it to 
     # positive range (without reordering) then normalize.
     # normalize p array
