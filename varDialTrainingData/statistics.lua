@@ -6,21 +6,55 @@
   to determine hits and errors.
   Provides some statistics.
 
-  The interesting file name is provided as the first argument on the cmd line
+  The interesting test data is read from standard input
+
+  Command line arguments:
+     -gold filename
 --]]
 
+-- set up defaults
+testing = "testing"
+dialects = {EGY = 1, GLF = 2, LAV = 3, MSA = 4, NOR = 5}
+numDialects = 5
+
+ignore = false -- true -- ignore "lua"
+--argindex = -1
+for argindex,x in ipairs(arg) do 
+    --argindex = 1 + argindex
+    if ignore then 
+        ignore = false
+    else
+        if x == "-gold" then 
+	    testing = arg[argindex+1]
+	    ignore = true
+        elseif x == "-gdi" then
+            dialects = {BE = 1, BS = 2, LU = 3, ZH = 4}
+            numDialects = 4
+	else
+	    print("unrecognized switch option", x)
+        end
+    end
+end
 dbg = require "LuaDebugger.debugger"
 
-dialects = {EGY = 1, GLF = 2, LAV = 3, MSA = 4, NOR = 5}
 idialect = {}
 for k,v in pairs(dialects) do idialect[v] = k end -- for k,v
 
-crosserrors = {{0,0,0,0,0}, {0,0,0,0,0}, {0,0,0,0,0}, {0,0,0,0,0}, {0,0,0,0,0} }
+--crosserrors={{0,0,0,0,0}, {0,0,0,0,0}, {0,0,0,0,0}, {0,0,0,0,0}, {0,0,0,0,0} }
+crosserrors = {}
+for i=1,numDialects do 
+    crosserrors[i] = {}
+    for j=1,numDialects do 
+        crosserrors[i][j] = 0;
+    end
+end
+
 totalerror = 0
 
 finterest = io.stdin  --io.open(arg[1],'r')
-fref = io.open('testing','r')
-if not fref then print ('?cannot open "testing"') end --if not fref
+fref = io.open(testing,'r')
+if not fref then print ('?cannot open', testing) end --if not fref
+print("Gold file",testing)
 
 -- read through the answer file
 number = 0
@@ -62,12 +96,12 @@ print('fraction wrong', totalerror/number)
 print()
 io.write('ref\\test')
 
-for c = 1,5 do io.write('     '..idialect[c]) end -- for c
+for c = 1,numDialects do io.write('     '..idialect[c]) end -- for c
 io.write('\n')
 
-for r = 1,5 do
+for r = 1,numDialects do
     io.write(idialect[r]..'       ')
-    for c = 1,5 do
+    for c = 1,numDialects do
         io.write(string.format("%5d   ",crosserrors[r][c]))
     end -- for c
     io.write('\n')

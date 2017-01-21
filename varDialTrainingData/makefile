@@ -13,11 +13,57 @@ test.txt:	training
 
 
 #
+charsA:	chars.c
+	gcc -D ARABIC chars.c -lm -o charsA
+
+charsG:	chars.c
+	gcc -D GDI chars.c -lm -o charsG
+
 %.stat:	cv/%.t7
 	th test.lua -init_from $^ < varDialTrainingData/test.txt | (cd varDialTrainingData; th statistics.lua )
 
-wordstats:	wordfreq.py
-	python3 wordfreq.py | (cd varDialTrainingData; th statistics.lua ) 
+phstats1:	charsA
+	./charsA   | (cd varDialTrainingData; th statistics.lua  ) 
+
+phstats2:	charsA
+	./charsA  -test ctxt | (cd varDialTrainingData; th statistics.lua -gold ../dtest.txt ) 
+
+wenstats7:	
+	python3 wentropy.py -max_n_gram 3 -test ctxt | (cd varDialTrainingData; th statistics.lua -gold ../dtest.txt ) 
+
+wenstats6:	
+	python3 wentropy.py -max_n_gram 3  | (cd varDialTrainingData; th statistics.lua  ) 
+
+wenstats5:	
+	python3 wentropy.py -max_n_gram 2 -test ctxt | (cd varDialTrainingData; th statistics.lua -gold ../dtest.txt ) 
+
+wenstats4:	
+	python3 wentropy.py -max_n_gram 2  | (cd varDialTrainingData; th statistics.lua  ) 
+
+wenstats3:	
+	python3 wentropy.py  -test ctxt | (cd varDialTrainingData; th statistics.lua -gold ../dtest.txt ) 
+
+wenstats2:	
+	python3 wentropy.py   | (cd varDialTrainingData; th statistics.lua  ) 
+
+wenstats1:	
+	python3 varDial3/wentropy.py -test ctxt | (cd varDialTrainingData; th statistics.lua -gold ../dtest.txt ) 
+
+wenstats0:	
+	python3 wentropy.py | (cd varDialTrainingData; th statistics.lua ) 
+
+
+wordstats3:	
+	python3 wordfreq.py  -test ctxt | (cd varDialTrainingData; th statistics.lua -gold ../dtest.txt ) 
+
+wordstats2:	
+	python3 wordfreq.py   | (cd varDialTrainingData; th statistics.lua  ) 
+
+wordstats1:	
+	python3 ../varDial3/wordfreq.py -test ctxt | (cd varDialTrainingData; th statistics.lua -gold ../dtest.txt ) 
+
+wordstats0:	
+	python3 ../varDial3/wordfreq.py | (cd varDialTrainingData; th statistics.lua ) 
 
 p88.txt:	wordfreq.py
 	python3 wordfreq.py -test varDialTrainingData/valid.txt -pout p88.txt > q88.txt

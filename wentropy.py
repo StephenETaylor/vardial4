@@ -14,6 +14,9 @@ an n-gram worthwhile.
 """
 
 trainingFile = 'varDialTrainingData/training'
+#default to Arabic dialects
+idialect = ["OTH" , "EGY", "GLF", "LAV", "MSA", "NOR"]
+numDialects = 5
 
 five = 5
 ignore = True
@@ -31,14 +34,24 @@ for i,arg in enumerate(sys.argv):
     elif arg == '-combine':
         iprobsFile = sys.argv[i+1]
         ignore = True
+    elif arg == '-max_n_gram':
+        max_n_gram = int(sys.argv[i+1])
+        ignore = True
+    elif arg == '-nextDialect':
+        if idialect[0] == 'OTH': # if this is the first -nextDialect switch
+            idialect = ['oth']   # reset the list of dialects to empty
+            numDialects = 0
+        idialect.append( sys.argv[i+1])
+        numDialects += 1
+        ignore = True
     elif arg == '-pout':
         oprobsFile = sys.argv[i+1]
         ignore = True
     elif arg == '-test':
         testfn = sys.argv[i+1]
         ignore = True
-    elif arg == '-max_n_gram':
-        max_n_gram = int(sys.argv[i+1])
+    elif arg == '-train':
+        trainingFile = sys.argv[i+1]
         ignore = True
     elif arg == '-verbose':
         verbose = True
@@ -47,14 +60,13 @@ for i,arg in enumerate(sys.argv):
         print('usage:\npython3 wordfreq [-max_n_gram #][-test file][-cutoff num][-combine file][-pout file] > testout')
         sys.exit(1)
 
+dialect = {}
+for i,d in enumerate(idialect):
+    dialect[d] = i;
 
-idialect = ["OTH" , "EGY", "GLF", "LAV", "MSA", "NOR"]
-
-dialect = {'OTH': 0, 'EGY' : 1, 'GLF' : 2, 'LAV':3, 'MSA':4, 'NOR':5}
-
-totalWords = 0
 totalLines = 0
-dialCount = [0]*6
+totalWords = 0
+dialCount = [0]*len(idialect)
 
 freq1 = [dict(), dict(), dict(), dict(), dict(), dict()]
 freq2 = [dict(), dict(), dict(), dict(), dict(), dict()]
@@ -63,10 +75,11 @@ freq3 = [dict(), dict(), dict(), dict(), dict(), dict()]
 tr = open(trainingFile, 'r')
 
 for line in tr:
+    line = line.strip()
     totalLines += 1
     t = line.find('\t')
     text = line[:t]
-    dial = dialect[line[t+3:t+6]]
+    dial = dialect[line[t+3:]]
     words = ['start0','start1'] + text.split() + ['end0', 'end1']
     wm2 = wm1 = 'empty0'
     for w in words:
@@ -107,7 +120,7 @@ sig = [0, [], [], [], [], []] # we optionally report these, but don't retain
                               # them very long. So we don't need 1 for each n
 for n in range(max_n_gram):
     dev.append([0, {}, {}, {}, {}, {}])
-    for d in range(1,6): 
+    for d in range(1,numDialects+1): 
         for (w,k) in freq[n][d].items():
             if freq[n][0][w] < five: 
                 dev[n][d][w] = 0 
@@ -132,11 +145,11 @@ for n in range(max_n_gram):
   dev[n][d][w] where n is the n-gram size, d is an integer in the rage 1-5
 """
 freq = [freq1, freq2, freq3]
-unlikely = [0]*6
+unlikely = [0]*(numDialects+1)
 dev = []
 for n in range(max_n_gram):
     dev.append([0, {}, {}, {}, {}, {}])
-    for d in range(1,6): 
+    for d in range(1,(numDialects+1)): 
         unlikely[d] = -math.log(2,1/(dialCount[d] - n))
         for (w,k) in freq[n][d].items():
             #if freq[n][0][w] < five: 
@@ -155,53 +168,63 @@ if iprobsFile:
 if oprobsFile:
     oprobsFile = open(oprobsFile,'w')
 
+# in the following code, I attempt to choose the correct entropy by
+# ignoring second-through nth words in an n-gram. 
+# thus the ignored words add nothing to the entropy of the line,
+# and the division at the end of the loop effectively divides the frequency of
+# the n-gram  by n for each word.
+# [this captures the intuition that the cross entropy of "abc" and "abc" is 0
+# and the cross perplexity of "abc" wrt to "abcabc" is only at the "c's" where
+# there are two choices, so that the per-character perplexity is 8/6.]
+#This has the 
+# problem that I may miss adjacent but overlapping n-grams of high order.
+# I'll still catch a following n-gram as a smaller, perhaps n-1, but even 
+# possibly unigram, so that (after division by len(ll)) I'll have a slightly
+# too-high perplexity = too-low entropy. [although my log-probs are all 
+# negative, so aren't precisely entropies.]
+# a fix for this might be to maintain for each character a frequency-so-far
+# based on the n-grams we have considered. If it is part of an m-gram 
+# started in the last m characters, it has the log-probability of the m-gram,
+# divided by m; if it is also part of a k-gram 
+# it should have the lesser of the two probabilities.
 for line in test:
-    p = [0]*6   # probability for each dialect
+    p = [0]*(numDialects+1)   # probability for each dialect
     
     ll = line.split()
-    for w in ll:
-        for n in range(max_n_gram):
-            for d in range(1,6):
-                sigma = dev[n][d].get(w,unlikely[d])
-#            t += sigma **2 #compute log-normal probability from sigma
-#            if sigma < 0:
-#                p[d] += -t      # rare words make dialect choice less probable
-#            else:
-#                p[d] += t       # common ones more likely
+    for d in range(1,(numDialects+1)):
+        igncnt = 0
+        for w in ll:
+            if igncnt > 0:
+                igncnt += -1
+            else :
+                sigma = 0
+                for n in range(max_n_gram-1,-1,-1):
+                    if sigma == 0:
+                        sigma = dev[n][d].get(w,0)
+                        if sigma != 0:
+                            igncnt = n-1
+                            break
+                if sigma == 0:
+                    sigma = unlikely[d]
                 p[d] += sigma
 
-    for d in range(1,6):
+    for d in range(1,(numDialects+1)):
         p[d] = p[d] / len(ll) / max_n_gram # normalize per word.  
 
-    # p[d] is a sum of deviations, not of probabilities
-    # we could have converted the deviations to probabilities with the
-    # cumulative probability distribution for the normal distribution, e.g. 
-    # two standard deviations below the mean is a probability of 0.0228,
-    # and three standard deviations above is a probability of 0.9987;
-    #  This computation would be straightforward in python 3.2 using
-    #  p[w] = 0.5 + math.erf(dev[n][d][w]/math.sqrt(2))/2
-    # but 1) We're using the frequency in the whole training set, not just the
-    #        dialect to compute interesting words, so the cross-entropy
-    #        calculation is a little messed up anyway
-    #     2) We'd want the log of the probability anyway to make the math
-    #        make sense.
-    #     3) each of those transformations is monotonic anyway.
-
-    # earlier, useless comment: (there's an intuition, but no good math for it)
-    # P array ranges from -infinity to +infinity.  Use math.exp to bring it to 
-    # positive range (without reordering) then normalize.
-    # normalize p array
-    #  first ensure no numeric overflow
-    s = max(p[1:6])
-    for i in range(1,6):
-            p[i] += -s
+    ## p array ranges from -infinity to 0.  Use math.exp to bring it to 
+    ## positive range (without reordering) then normalize.
+    ## normalize p array
+    ##  first ensure no numeric overflow
+    #s = max(p[1:(numDialects+1)])
+    #for i in range(1,(numDialects+1)):
+    #        p[i] += -s
     # convert to positive numbers
-    for i in range(1,6):
+    for i in range(1,(numDialects+1)):
         p[i] = math.exp(p[i])
 
     # normalize to sum to 1
-    s = sum(p[1:6])
-    for i in range(1,6):
+    s = sum(p[1:(numDialects+1)])
+    for i in range(1,(numDialects+1)):
         p[i] = p[i] / s 
 
     # if -pout, write normalized probabilities to file
@@ -211,12 +234,12 @@ for line in test:
     # if combining, add in another normalized probability from file
     if iprobsFile:
         pother = iprobsFile.readline().split()
-        for i in range(1,6):
+        for i in range(1,(numDialects+1)):
             p[i] += float(pother[i-1])
 
     # find largest likelihood (without renormalizing)
     dial = 1
-    for i in range(2,6):
+    for i in range(2,(numDialects+1)):
         if p[i] > p[dial]: dial = i
     print(line[:-1] + '\t' + idialect[dial])
 
