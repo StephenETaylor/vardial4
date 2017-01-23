@@ -20,7 +20,7 @@ for line in fr:
     rdict[meta] = dialect
 
 # now read through .words file
-fin = open(argv[1],'r') 
+fin = open(sys.argv[1],'r') 
 for line in fin:
     line = line.strip()
     sp = line.find(' ')
@@ -28,6 +28,6 @@ for line in fin:
     text = line[sp+1:]
 
     standard = rdict[meta]
-    ts = langlist[int(standard)+1]
+    ts = langList[int(standard)-1]
     # write out line in gold format
     print(text+'\tQ\t'+ts)

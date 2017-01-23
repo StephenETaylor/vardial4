@@ -193,16 +193,26 @@ for line in test:
     ll = line.split()
     for d in range(1,(numDialects+1)):
         igncnt = 0
-        for w in ll:
+        for i,w in enumerate(ll):
+
             if igncnt > 0:
                 igncnt += -1
             else :
+                # build w, w1, w2
+                if i+1 < len(ll): w2 = w+' '+ll[i+1]
+                else: 
+                    w2 = w+' end0'
+                    w3 = w+' end0 end1'
+                if i+2 < len(ll): w3 = w2 + ' ' + ll[i+2]
+                elif i+1 < len(ll): w3 = w2 +' end0'
+
                 sigma = 0
                 for n in range(max_n_gram-1,-1,-1):
+                    w0 = [w, w2, w3][n]
                     if sigma == 0:
-                        sigma = dev[n][d].get(w,0)
+                        sigma = dev[n][d].get(w0,0)
                         if sigma != 0:
-                            igncnt = n-1
+                            igncnt = n
                             break
                 if sigma == 0:
                     sigma = unlikely[d]

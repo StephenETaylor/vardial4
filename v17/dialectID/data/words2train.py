@@ -5,6 +5,8 @@
 #   text\tQ\tDIA
 
 import sys
-for line in stdin:
+inf = open(sys.argv[1])
+for line in inf:
+    line = line.strip()
     sp = line.find(' ')
     print(line[sp+1:]+'\tQ\t'+line[:3])

@@ -257,3 +257,131 @@ move on.  How does one handle the penalties for multi-byte characters?
 
 Currently I return 2 for that error, but should return a negative log.
 added that code.  The return value is added to the entropy for the dialect.
+
+--
+So swiss-german (GDI) data seems to work, but it looks like I didn't 
+finish converting the DSL/dialectID/data/train.varDial2017 files to 
+vardial3 format.
+
+So back to that task.  DSL/dialect/data/Makefile claims to do it but doesn't.
+reference2gold.py fails, missing (sys.) on argv, adding 1 instead of subtracting
+code clearly undebugged...
+but it seems easy.
+
+7PM: Now running on the development data for wentropy.py and charsA programs;
+neither gives results as good as the "baseline"
+See v17/dialectID/Makefile
+
+How can I combine these with the baseline programs?  The hypothesis files
+seem like a good scheme for conveying some of the basis of a decision, except
+that I don't know how to interpret them.  
+
+I could feed just the various answers/suggestions into a neural network, and
+try to train it on the development data.  I could output hypothesis-file like
+files, which for example would contain the relative entropies of the
+various choices, into a neural net, and train with more data.
+
+Without a neural net, a simple combination function could use the
+matrix of successes and failures to discount an answer:
+so if the wentropy program predicts MSA, it's right 246 out of 511 times;
+if it predicts NOR it is right 87/176 times; LAV, 148/253 times, etc.
+Then disagreement is slightly less likely to result in a tie, and more
+reliable guessers are more likely to win.
+So I'll try that...
+One obstacle is that the data may not be in the same order...
+The hypothesis file includes the meta-data, whereas the test{e,c} files
+contain the data itself.  (Did I already write this code?)
+
+So I wrote dialectID/vote.py
+and made appropriate changes to dialectID/Makefile
+make vstat shows 673 errors, whereas ./run.sh shows 651 errors.
+(in other words, using the additional files actually makes things worse.)
+I had this same experience with combiner.py during vardial3.  Then I wrote
+a neural network which worked a little better.
+
+Sunday Jan 22, 2017
+
+Before I start on the neural network idea, I thought maybe I'm voting wrong.
+So my current algorithm is, find guess for each of four files.  Weight each
+guess by the probability that that source is correct for that guess.
+*Then add them all up*
+Clearly the procedure of adding does not give a probability.  And three 
+sources which are all near chance, 20% (though none of mine are) would add to 
+60%, outweighing a source with a 50% weight, which is much better than chance.
+So maybe the weighting isn't right.  (But it covers a fairly narrow range, 0.4-0.6 anyway.)
+But also you can't add probabilities.  I think you *can* multiply complements.
+So if source one predicts A with prob 0.5 and source two predicts A with prob
+0.4, 
+>They agree, so either both are right or both are wrong.
+>One is wrong with prob 0.5 and two is wrong with prob 0.6, 
+>so both are wrong with prob 0.3, 
+>and both are right with prob 0.7.
+
+That change does change the voting errors from 671 to 658, but it is still
+worse than the baseline.
+
+Conversation with Abualsoud.  He suggests using matlab package for multiple 
+linear regression to train the coefficients for combining packages.
+
+Aziz writes that he has achieved accuracy of 63.7% on the development set.
+
+Abualsoud suggests that it would be nice to use a dnn, maybe an rnn on
+a sequence of gmm coefficients.  He is examining the wav files, using 256
+gmms to obtain a sequence of pre-phone values, with which he has been able to
+classify with an accuracy inthe 40% range.  He is trying again with 2048 gmms.
+
+He suggests training a combiner on the development set.  But need a test set as well.
+
+Some ideas for experiments:
+He says that training segments shorter than dev segments, might be 
+codeswitching in the dev segments.  
+He says that Ali reported:
+1) Arabic vs English 100%, no errors.
+2) MSA vs dialect 100%, no errors;
+under those circumstances, should be able to build MSA vs all classifier,
+with low error rate; then there are fewer dialects to distinguish from each
+other, should be easier.
+
+Maybe codeswitching is into and out of MSA, only one dialect per segment.
+Can we exploit this?
+
+
+
+summary of errors on dev set:
+charsA		861 56.5% wrong.
+wentropy 	772 50.7% wrong
+baseline ivec 	651 42.7% wrong
+baseline words	786 51.6% wrong
+
+So wentropy isn't so bad ... the error is quite close to (though lower than)
+the baseline words.  But is it doing bigrams?  Because if I add the
+-max_n_gram 2 flag I still get 772 errors.  So at best it is ignoring the flag.
+
+Reviewed the code; it was messing up, searching for unigrams in bigram 
+and trigram tables, and of course always failing.
+
+however, there seems to be a problem, now that I've fixed the lookup:
+much bigger error rates for bigrams and trigrams.
+wentropy.py -max_n_gram 1	772
+wentropy.py -max_n_gram 2	1071
+wentropy.py -max_n_gram 3	1122
+This could be due to assorted factors.  It's certainly astounding.
+possible problems I know about:  
+)I shingle the n-grams, don't overlap them.
+If I allow overlap, I'll need a per-character idea of smallest character entropy
+)igncnt could be broken.  (It was, wasn't skipping.  So finding a bigram
+meant just adding an extra penalty.)
+)many words are OOV, and of course many bigrams also.  If we find a bigram,
+ it is quite likely to be OOV for several dialects.  Since we are shingling,
+do we miss the chance to accumulate in-vocabulary words for the dialect?
+ -- no, we shingle each dialect separately.
+
+After fixing igncnt, the error count rose
+wentropy.py -max_n_gram 2	1236
+wentropy.py -max_n_gram 3	1244
+These are chance or worse.  Only one diagonal position is the max for its column, LAV; and not by much.
+
+There is a sensible-looking comment which says that the p array values
+range from -infinity to zero.  But in fact, we take -log(2,n/d), so they
+are positive.  So we should seek the smallest, but in the code we choose the
+largest -- which makes sense if we're choosing the largest negative value...
