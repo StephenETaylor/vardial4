@@ -272,6 +272,14 @@ but it seems easy.
 neither gives results as good as the "baseline"
 See v17/dialectID/Makefile
 
+January 24
+
+combined base word file and base ivec file with wentropy and chars output
+output is dialectID/test.f4
+
+made v17/DSL/GDI/GDI-test.{c,e}
+
+
 How can I combine these with the baseline programs?  The hypothesis files
 seem like a good scheme for conveying some of the basis of a decision, except
 that I don't know how to interpret them.  
@@ -385,3 +393,157 @@ There is a sensible-looking comment which says that the p array values
 range from -infinity to zero.  But in fact, we take -log(2,n/d), so they
 are positive.  So we should seek the smallest, but in the code we choose the
 largest -- which makes sense if we're choosing the largest negative value...
+
+Jan 23, 2017
+Turns out that I have a python braino.  -math.log(2,p) is log 2 base p, not
+log p base 2.  Still monotonic, opposite direction.  But since they aren't log
+probabilities, they don't add.
+ I'm going to commit the current state of wentropy, and then see if the
+identified fixes help.
+
+After editing the log function calls, I see improvements, but still bigrams
+and trigrams dont work.
+wentropy -max_n_gram 1	737 errors
+wentropy -max_n_gram 2	798 errors
+wentropy -max_n_gram 3	806 errors
+
+Looking at the first dev sentence I see that it (and all the first 5 also) is 
+EGY.  But it is diagnosed as LAV.  Second sentence is correctly guessed.
+
+(glancing at the wc for the training files, we see that the NOR segments are
+significantly shorter than the others.   MSA has the fewests segments, followed by GLF )
+
+Experimenting with the -cutoff parameter, I see small values don't affect
+recognition, but at -cutoff 10 and -cutoff 15 I see higher error rates overall,
+but bigger correct answers for GLF and NOR.
+
+walking through first and second test segments for EGY.
+first segment (should be EGY, guesses LAV):
+WORD		EGY			LAV			COMMENT
+tthdm, 		-16.446550255546747	-16.004110714772633	(not in tables)
+AlmsAjd 	-16.446550255546747	-15.004110714772633	in LAV 2
+fy		-5.145054060564196	-5.3152930344173255
+synA		-14.446550255546747	-16.004110714772633	in EGY 4
+wAl>bAt$y	-16.446550255546747     -16.004110714772633
+sxryp		-16.446550255546747     -16.004110714772633
+mn		-5.933809792743247	-5.870968502372031
+Alhjrp		-15.446550255546747	-16.004110714772633
+Alnbwyp		-16.446550255546747	-16.004110714772633
+fy              -5.145054060564196      -5.3152930344173255
+Aljryda		-15.446550255546747	-16.004110714772633
+Alrsmya		-14.446550255546747	-13.419148214051475
+lma		-9.237096889917796	-8.992883459349377
+mAdty		-16.446550255546747	-16.004110714772633
+Altrbya		-14.861587754825589	-12.303670996631539
+Al<slAmyp	-11.98711863690945	-12.19675579271503
+mn              -5.933809792743247      -5.870968502372031
+AlmdArs		-13.124622160659383	-10.959716595414179
+
+>Most of the differences here might have to do with differences in topics
+in the training files.  So Al<slamyp insignificantly more common in EGY,
+Altrbya (education) is six times as common in the LAV training.
+>Since there are more EGY words in training, the not-found penalty is bigger for
+EGY than LAV; it occurs the same number of times in both samples, though
+not for the same words, and the difference is half of the difference
+between samples.  
+>Since the penalty is the same as the single-word cost,
+we can't easily distinguish them in this table.
+
+I tried a fixed penalty for all dialects of 17, but got an amazing number 
+of errors.  switched to variable 1/2 the frequency of singletons, different 
+#'s of errors, approximately the same as before.  Regressed to penalty of 
+singletons.  Gives identical output for cutoff = 1 and -cutoff=2, a couple more
+for -cutoff 3.
+
+Coded -bag switch.  It adds the log-prob for each n-gram, including penalties
+for misses, into the segment cross-entropy. Seems like it should work, but 
+doesn't.  Tried playing with the penalties, but my strategies didn't work.
+all those high penalties swept many segments into NOR, which has smallest # of
+training words, hence lowest singleton penalty.
+Will recode, so that it uses best probability for each gram (a flavor
+of shingling.)
+However, it's necessary to make sure that there's a penalty!
+Coded the penalty into the bag code.  Currently -bag gives 
+wentropy -bag -max_n_gram 1 -cutoff 1  737 errors
+wentropy -bag -max_n_gram 2 -cutoff 1  802 errors
+wentropy -bag -max_n_gram 3 -cutoff 1  833 errors
+
+So bigrams *Still* don't work.  It's hard to see how you lose information 
+considering bigrams!
+
+Jan 24, 2017  
+Abualsoud sent me a package for combining classifiers, "focal"
+Spent the day considering combining packages.
+settled on focal_multiclass.
+made some tiny edits to port from matlab to octave:
+  > added do_braindead_shortcircuit_evaluation(1,"local") to train_nary...
+  > changed a couple of 
+     (nargs > ...) & ~isempty(...) ... #matlab does "short-circuit" here
+to   ....          && ...              # this is octave explicit "short-circuit"
+
+Finally, about 10PM succeeded in combining the two baseline programs.
+The file is dialectID/fusem.m  -- run with octave fusem.m
+
+I'd like to complete this by combining at least the wentropy output, maybe
+chars;  I'd like to see how much improvement the combination produced in
+error rate.  I could do an "open" run by training the fusion on 
+the vardial3 data/test  files.
+
+Need to see how to train, test, on arbitrary files for the baseline programs.
+Otherwise difficult to evaluate results.
+
+Jan 25, 2017  (I expect to see the test data today!)
+In answer to my "need to see how" of yesterday:
+    svm_multiclass_learn -c 1000 train model
+    svm_multiclass_classify test model hypothesis
+
+But it is really just the test  part I need to handle.  Commented the tidy up
+code at the bottom the run.sh which deletes the test and train files, so 
+that I can review the formats.
+
+The train file for multiclass learn  (for .ivec) consists of 13825 lines.
+The first line(s) are an answer and 400 space separated features, the answer
+is an int, for Arabic dialects from 1 to 5, each feature of the form:
+362:0.104703
+
+The train file for multiclass learn for .words consists of 14000 lines.
+The lines consist of a class field followed by feature fields.
+the class field is an int, 1-5.
+The feature fields are of the form 96859:1
+with the feature numbers, believed to correspond to unique words or bigrams in the 
+text, all in order on the line.  The value for the feature appears to be the
+number of times that the word occurs on the line.
+the last lines seem to be in the same format.
+
+Okay:  The word features are listed in dict.words.2.  They include
+words and bigrams.  The words in a bigram are in reading order, connected with
+two underscores.  
+all.words.<process> is a list of the training files without anything but the words, no meta-tags, no class labelling.
+
+for the released training data, the last feature number is 230536
+Its not clear whether we can test a file with OOV words; we could
+conceivably invent new feature numbers, or just omit any features for the 
+new words.  It does seem like this discards information...
+
+I notice that my latest run of the words baseline gave 738 errors, versus
+786 recorded earlier?   Braino?  random numbers? cosmic rays?
+
+I think I want to build a .wf file from a test file, using dict.words.2
+I'm going to write a python program.  As a preliminary, I'll glance at the
+makeDictPrepSVM.py file.  Notice that the model and the dictionary have to 
+match.  And preparing stuff doesn't take very long... so maybe I don't 
+need my script.
+
+9:40 PM
+dialectID/Makefile
+contains instructions to make test.f4, which is a fusion of the two baseline 
+files and my two files, wentropy.py and charsA on the ADI testset.
+
+The program fails; chars.c seems to include the metatags in its input, which
+is the fault of my makefile, not of anything else... so probably wentropy
+does also.  Check it and fixit.
+
+Jan 24
+
+created a vardial4/submission directory, which holds 2 GDI runs and an ADI run,
+the latter is dialectID/test.f4

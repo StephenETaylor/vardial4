@@ -23,6 +23,8 @@ int Verbose; // command line flag
 int maxTrainingSize = 1800000;
 char trainFile[100]="varDialTrainingData/training";
 char testFile[100]="varDialTrainingData/test.txt";
+char houtFile[100]="";
+FILE* fhout;
 int maxLines = 8000;
 // for the Arabic dialects case
 #ifdef ARABIC
@@ -219,16 +221,20 @@ int main(int nargs, char**argv){
         if (ignore){// ignoring this argument
             ignore = false; // because it was parameter of previous
         }
-        else if (0==strcmp(argv[i],"-verbose")){
-            Verbose = true;
-        }
-        else if (0==strcmp(argv[i], "-train")){
-            strncpy(trainFile,argv[i+1],99);
+        else if (0==strcmp(argv[i], "-hout")){
+            strncpy(houtFile,argv[i+1],99);
             ignore = true;
         }
         else if (0==strcmp(argv[i], "-test")){
             strncpy(testFile,argv[i+1],99);
             ignore = true;
+        }
+        else if (0==strcmp(argv[i], "-train")){
+            strncpy(trainFile,argv[i+1],99);
+            ignore = true;
+        }
+        else if (0==strcmp(argv[i],"-verbose")){
+            Verbose = true;
         }
         else {
             fprintf(stderr,"Unrecognized Switch %s\n",argv[i]);
@@ -394,6 +400,9 @@ int main(int nargs, char**argv){
     // open test file -- I only want to read it a line at a time.
     // so I use C library input  (isn't this buffered?)
     FILE* ftest = fopen(testFile,"r");
+    if (houtFile[0]){ // if writing to houtFile
+        fhout = fopen(houtFile,"w");
+    }
 
     //in order to use the strptr structure, I read the test line into the 
     // data array.
@@ -430,6 +439,15 @@ int main(int nargs, char**argv){
             if (entropy[dialect] < entropy[i]){
                 dialect = i;
             }
+        }
+
+        // possibly write houtFile
+        if (houtFile[0]){// dialect entropy0 entropy1 ...}
+            fprintf(fhout,"%d",dialect+1);
+            for (i=0; i<numDialects; i++){
+                fprintf(fhout," %lf",entropy[i]);
+            }
+            fprintf(fhout,"\n");
         }
 
         // write test string, tab, dialect to stdout
