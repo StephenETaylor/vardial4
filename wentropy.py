@@ -18,21 +18,33 @@ trainingFile = 'varDialTrainingData/training'
 idialect = ["OTH" , "EGY", "GLF", "LAV", "MSA", "NOR"]
 numDialects = 5
 
-five = 5
+five = 1
 ignore = True
 iprobsFile = None
 oprobsFile = None
 testfn = 'varDialTrainingData/test.txt'
+least_n_gram = 1
 max_n_gram = 1
 verbose = False
+SHINGLE = True
+HYPFORM = False
 
 for i,arg in enumerate(sys.argv):
     if ignore: ignore = False
+    elif arg == '-bag':
+        SHINGLE = False
     elif arg == '-cutoff':
-        five = sys.argv[i+1]
+        five = int(sys.argv[i+1])
         ignore = True
     elif arg == '-combine':
         iprobsFile = sys.argv[i+1]
+        ignore = True
+    elif arg == '-hout':
+        oprobsFile = sys.argv[i+1]
+        ignore = True
+        HYPFORM = True
+    elif arg =='-least_n_gram':
+        least_n_gram = int(sys.argv[i+1])
         ignore = True
     elif arg == '-max_n_gram':
         max_n_gram = int(sys.argv[i+1])
@@ -150,13 +162,13 @@ dev = []
 for n in range(max_n_gram):
     dev.append([0, {}, {}, {}, {}, {}])
     for d in range(1,(numDialects+1)): 
-        unlikely[d] = -math.log(2,1/(dialCount[d] - n))
+        unlikely[d] = math.log(1/(dialCount[d] ), 2)
         for (w,k) in freq[n][d].items():
-            #if freq[n][0][w] < five: 
-            #    dev[n][d][w] = 0 
-            #    continue  # ignore infrequent words
-            p = freq[n][d][w] / (dialCount[d] - n)
-            dev[n][d][w] = -math.log(2,p)
+            if freq[n][0][w] < five: 
+                dev[n][d][w] = 0 
+                continue  # ignore infrequent words
+            p = freq[n][d][w] / (dialCount[d] )
+            dev[n][d][w] = math.log(p,2)
 
 # now  compute most-likely dialects for bag of words sentences from test file
 test = open(testfn,'r')
@@ -192,6 +204,7 @@ for line in test:
     
     ll = line.split()
     for d in range(1,(numDialects+1)):
+        llp = [0]*(max_n_gram+len(ll))   #used by BAG mode
         igncnt = 0
         for i,w in enumerate(ll):
 
@@ -207,19 +220,34 @@ for line in test:
                 elif i+1 < len(ll): w3 = w2 +' end0'
 
                 sigma = 0
-                for n in range(max_n_gram-1,-1,-1):
-                    w0 = [w, w2, w3][n]
+                if SHINGLE:
+                    for n in range(max_n_gram-1,least_n_gram-1-1,-1):
+                        w0 = [w, w2, w3][n]
+                        if sigma == 0:
+                            sigma = dev[n][d].get(w0,0)
+                            if sigma != 0:
+                                igncnt = n
+                                break
                     if sigma == 0:
-                        sigma = dev[n][d].get(w0,0)
-                        if sigma != 0:
-                            igncnt = n
-                            break
-                if sigma == 0:
-                    sigma = unlikely[d]
+                        sigma = unlikely[d]
+                else: # BAG mode.  find greatest probability for every gram
+                    for n in range(max_n_gram-1,least_n_gram-1-1,-1):
+                        w0 = [w, w2, w3][n]
+                        delta = dev[n][d].get(w0,0)/(n+1)
+                        if delta !=0:
+                            for j in range(i,i+n+1):
+                                if llp[j] == 0 or llp[j] < delta:
+                                    llp[j] = delta
+                    if llp[i] != 0:
+                        sigma = llp[i] # we've now considered all the ngrams
+                                   # that char i could be in.   
+                    else:
+                        sigma = unlikely[d]
+
                 p[d] += sigma
 
     for d in range(1,(numDialects+1)):
-        p[d] = p[d] / len(ll) / max_n_gram # normalize per word.  
+        p[d] = p[d] / len(ll)# / max_n_gram # normalize per word.  
 
     ## p array ranges from -infinity to 0.  Use math.exp to bring it to 
     ## positive range (without reordering) then normalize.
@@ -229,8 +257,9 @@ for line in test:
     #for i in range(1,(numDialects+1)):
     #        p[i] += -s
     # convert to positive numbers
+    ln2 = math.log(2)
     for i in range(1,(numDialects+1)):
-        p[i] = math.exp(p[i])
+        p[i] = math.exp(p[i]*ln2) # 2**p[i]
 
     # normalize to sum to 1
     s = sum(p[1:(numDialects+1)])
@@ -239,6 +268,13 @@ for line in test:
 
     # if -pout, write normalized probabilities to file
     if oprobsFile: 
+        if HYPFORM:  # if we want the probsfile to be in "hypothesis" format
+            # find largest likelihood (without renormalizing)
+            dial = 1
+            for i in range(2,(numDialects+1)):
+                if p[i] > p[dial]: dial = i
+            oprobsFile.write(str(dial)+' ') #output guess
+
         oprobsFile.write('{:.5f} {:.5f} {:.5f} {:.5f} {:.5f}\n'.format(p[1],p[2],p[3],p[4],p[5]))
 
     # if combining, add in another normalized probability from file
